@@ -1,643 +1,1266 @@
-
-#include <stdlib.h>  
-#include <stdio.h>
 #include <conio.h>
-#include <string.h>
+#include <cstring>
+#include <iostream>
 #include <windows.h>
-#define TRUE 1
-#define FALSE 0
-#define MAXIMUS 16
-int Cx,Cy;//光标坐标
-void runpcgame();//人机模式
-void runmangame();//人人模式
-struct players_list//胜利玩家排行榜
-{	
-	char name[11];
-	int score;
-}players[100],temp;//最多存储100个玩家
-struct position 
+#include <algorithm>
+#include <cctype>
+#include <cstdio>
+#include <fstream>
+#include <string>
+#include <math.h>
+
+#define NumOfLines (15)
+#define huo5 if(count==5)return 1;
+#define huo5_1 if(count==5) return 2;
+#define samekey same(row + dx[u] * i, col + dy[u] * i, key)// judge if the next pieces's color is the same with the current piece's
+#define sumkadd for (i = 1; samekey; i++)sumk++; //positive traversal
+#define sumksub for (i = -1; samekey; i--)sumk++;//negative traversal
+#define off if(!inboard(row + dx[u] * i, col + dy[u] * i) || chess_board[row + dx[u] * i][col + dy[u] * i] != 0)continue;//judge cross the border
+
+int chess_board[NumOfLines][NumOfLines];//0 None，1 red，2blue  1●2○,red first drops and blue second drops
+int player_state = 0, ais = 1, player0;//player_state=1,AI drops; player=2, player drops. player=player0, Red drops otherwise Blue drops.
+bool is_end = false;
+int dx[8] = { 1, 1, 0, -1, -1, -1, 0, 1 }; //flat technology
+int dy[8] = { 0, 1, 1, 1, 0, -1, -1, -1 };//（dx,dy） are 8 direction vectors
+
+COORD cursor;
+
+class Chess
 {
-	int x;
-	int y;
-	int score;
-};
-struct position positions[50];
-int position_order;
-int count;//总落子数量 
-char chess_board[16][16],cp;//cp为棋子（*、O、空） 
-void startgame()//开始游戏界面，选择游戏模式 
+	int chess_board[NumOfLines][NumOfLines];
+public:
+	bool init_board_array();
+	bool win() const;
+	bool dropout(int, int);
+	bool AM_Win(int player);
+
+	friend bool man2man_move_drop(int);
+	friend int CalSumPieces(Chess);
+} Red, Blue, AM;
+
+void gotoxy(int, int);
+int CalSumPieces(Chess);
+bool ShowNumOfPieces(int, int, int);
+bool is_full(void);
+bool after_win(int);
+inline bool my_isdigit(char);
+int Find_Demarcator(std::string);
+bool Output(void);
+bool Input(int, int);
+bool Scorelist(int, int);
+void startgame(void);
+void restartgame(void);
+bool ManVsMan();
+bool man2man_move_drop(int);
+bool draw_board();
+bool draw_dropout(int);
+bool init_board_interface(int);
+
+inline int my_abs(int T)
 {
-	int i;
-	printf("\t\t****************************\n");
-	printf("\t\t*       五子棋             *\n");
-	printf("\t\t* 模式1:人机模式           *\n");
-	printf("\t\t* 模式2:人人模式           *\n");
-	printf("\t\t* 模式0:退出游戏           *\n");
-	printf("\t\t****************************\n");
-	printf("\t\t*使用方向键↑↓←→移动光标*\n");
-	printf("\t\t*使用空格键落子            *\n");
-	printf("\t\t*游戏中可按下ESC退出游戏   *\n");
-	printf("\t\t****************************\n");
-	printf("请输入选项：");
-	while(1){
-		scanf("%d",&i);
-		getchar();
-		if(i==1) runpcgame();
-		else if(i==2) runmangame();
-		else if(i==0) exit(0);
-		else{
-			printf("其他功能即将上线,请重新选择模式:");
-			continue;
-		}
-	}
+	return abs(T);
 }
-void scorelist(int scores,char cp)//分数排行榜 
+
+bool Chess::init_board_array()
+{
+	for (int i = 0; i < NumOfLines; i++)
+		memset(chess_board[i], 0, sizeof(chess_board[i]));
+	return true;
+}
+
+bool init_board_interface(int function)
 {
 	system("cls");
-	int score[100],j=0;
-	static int times=0;
-	char s[12],ch,str[12];
-	if(cp=='*') printf("黑方胜利，请输入你的名字(输入quit结束程序)：\n");
-	else printf("白方胜利，请输入你的名字(输入quit结束程序)：\n");
-	scanf("%s",s);
-	getchar();
-	if(strcmp(s,"quit")==0)
-		exit(0);
-	strcpy(players[times].name,s);
-	players[times].score=scores;
-	printf("  \t\t分数排行榜\n");
-	printf("排名\t\t昵称\t\t分数\n");
-	for(j=0;j<=times;j++){
-		int k;
-		for(k=j+1;k<=times;k++)		
-			if(players[j].score<players[k].score){
-				temp=players[j];
-				players[j]=players[k];
-				players[k]=temp;
-			}
-	}
-	for(j=0;j<=times;j++){
-		printf("%d\t\t%s",j+1,players[j].name);
-		switch(strlen(players[j].name))//平衡一下长短不一的名字
-		{
-			case 1:{printf("%17d\n",players[j].score);break;}
-			case 2:{printf("%16d\n",players[j].score);break;}
-			case 3:{printf("%15d\n",players[j].score);break;}
-			case 4:{printf("%14d\n",players[j].score);break;}
-			case 5:{printf("%13d\n",players[j].score);break;}
-			case 6:{printf("%12d\n",players[j].score);break;}
-			case 7:{printf("%11d\n",players[j].score);break;}
-			case 8:{printf("%10d\n",players[j].score);break;}
-			case 9:{printf("%9d\n",players[j].score);break;}
-			case 10:{printf("%8d\n",players[j].score);break;}
-			default:break;
-		}
-	}
-	times++;//计数玩家已经玩了几个回合
-	count=0;//将已经落下的棋子数归零
-	printf("\n");
-	while(1){
-		printf("是否继续进行游戏？Y/N\n");
-		scanf("%c",&ch);
-		getchar();
-		if(ch=='N') exit(0);
-		else if(ch=='Y') startgame();
-		else continue;
-	}
-}
-void initialize_board(void)//初始化棋盘 
-{
-	count=0;
-	int i, j;
-	for (i = 0;i<16;i++) 
-		for (j = 0;j<16;j++)
-			chess_board[i][j]= ' ';
-	Cx=17;
-	Cy=16;
-	cp='*';
-}
-void initial_positions(void)//初始化棋盘得分 
-{
-	positions[0].x = positions[0].y = positions[0].score = 0;
-	for (position_order = 1;position_order < 50;position_order++) 
-		positions[position_order] = positions[0];
-	position_order = 0;
-}
-void print_board()//每次下棋后打印新棋盘 
-{
-	int i, j;
-	for (i = 0;i < 33;i++) { 
-		for (j = 0;j < 33;j++) {
-			if (i == 0 && j == 0) /*The first row*/ printf("┌  ");
-			else if (i == 0 && j==32) printf("┐");
-			else if (i == 0 && j % 2 == 0) printf("┬  ");
-			if (i == 32 && j == 0)/*The last row*/ printf("└  ");
-			else if (i == 32 && j == 32) printf("┘");
-			else if (i == 32 && j % 2 == 0) printf("┴  ");
-			if (i != 0 && i != 32) /*The other rows*/{
-				if (i % 2 == 0) {
-					if (j == 0) printf("├  ");
-					else if (j == 32) printf("┤");
-					else if (j % 2 == 0) printf("┼  ");
-				}
-				else if(j % 2 == 0){
-					if(i==Cx&&j==Cy)printf("  X");
-					else printf("  %c", chess_board[(i - 1) / 2][(j+1)/2]);
-				}
-			}
-		}
-		putchar('\n');
-	}
-	if(cp=='*') printf("请黑方落子！");
-	else printf("请白方落子！");
-}
-int is_full()//判断棋盘是否已满 
-{
-	int i, j;
-	for (i = 0;i < 16;i++)
-		for (j = 0;j < 16;j++)
-			if (chess_board[i][j] == ' ') return FALSE;
-	return TRUE;
-}
-void is_win(int x, int y, char cp)//人机判断胜负 
-{
-	int i, num=0;
-	char var;
-	for (i = 0;chess_board[y][x + i]==cp;i++,num++);
-	for (i = -1;chess_board[y][x + i]==cp;i--,num++);
-	if (num >= 5) {
-		system("cls");
-		print_board();
-		printf("%c win!", cp);
-		if(cp=='*') scorelist(count/2+1,cp);
-		else{
-			system("pause");
-			system("cls"); 
-			printf("您是否想开始新的游戏？Y/N\n");
-			while(1){
-				var=getch();
-				if(var=='Y')  startgame();
-				else if(var=='N')  exit(0);
-				else  continue;
-			}
-		}
-	}
-	else num = 0; 
-	for (i = 0;chess_board[y + i][x] == cp;i++, num++);
-	for (i = -1;chess_board[y + i][x] == cp;i--, num++);
-	if (num >= 5){
-		system("cls");
-		print_board();
-		printf("%c win!", cp);
-		if(cp=='*') scorelist(count/2+1,cp);
-		else{
-			system("pause");
-			system("cls"); 
-			printf("您是否想开始新的游戏？Y/N\n");
-			while(1){
-				var=getch();
-				if(var=='Y')  startgame();
-				else if(var=='N')  exit(0);
-				else  continue;
-			}
-		}
-	}
-	else num = 0;
-	for (i = 0;chess_board[y + i][x + i] == cp;i++, num++);
-	for (i = -1;chess_board[y + i][x + i] == cp;i--, num++);
-	if (num >= 5){
-		system("cls");
-		print_board();
-		printf("%c win!", cp);
-		if(cp=='*') scorelist(count/2+1,cp);
-		else{
-			system("pause");
-			system("cls"); 
-			printf("您是否想开始新的游戏？Y/N\n");
-			while(1){
-				var=getch();
-				if(var=='Y')  startgame();
-				else if(var=='N')  exit(0);
-				else  continue;
-			}
-		}
-	}
-	else num = 0;
-	for (i = 0;chess_board[y + i][x - i] == cp;i++, num++);
-	for (i = -1;chess_board[y + i][x - i] == cp;i--, num++);
-	if (num >= 5){
-		system("cls");
-		print_board();
-		printf("%c win!", cp);
-		if(cp=='*') scorelist(count/2+1,cp);
-		else{
-			system("pause");
-			system("cls"); 
-			printf("您是否想开始新的游戏？Y/N\n");
-			while(1){
-				var=getch();
-				if(var=='Y')  startgame();
-				else if(var=='N')  exit(0);
-				else  continue;
-			}
-		}
-	}
-	else num = 0;
-}
-void is_winman(int a, int b, char cp)//人人判断胜负 
-{
-	int w=1,x=1,y=1,z=1,i;//累计不同方向的连续相同棋子数目
-	for(i=1;i<5;i++){	
-		if(b+i<MAXIMUS&&chess_board[a][b+i]==cp) w++;
-		else break;
-	}//向下检查  
-	for(i=1;i<5;i++){	
-		if(b-i>0&&chess_board[a][b-i]==cp) w++;
-		else break;
-	}//向上检查  
-	if(w>=5){
-		printf("%c方胜利！",cp); 
-		system("pause");
-		system("cls");
-		print_board();
-		if(cp=='*') scorelist(256-(count+1)/2,cp);
-		else scorelist(256-(count-1)/2,'O');
-	}
-	for(i=1;i<5;i++){
-		if(a+i<MAXIMUS&&chess_board[a+i][b]==cp) x++;
-		else break;
-	}//向右检查  
-	for(i=1;i<5;i++)
+	gotoxy(70, 2);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE | FOREGROUND_GREEN);
+	if (function == 3)
 	{
-		if(a-i>0&&chess_board[a-i][b]==cp) x++;
-		else break;}//向左检查  
-	if(x>=5)
+		std::cout << "Man VS Man";
+		Red.init_board_array();
+		Blue.init_board_array();
+	}
+	else if(function==2||function==1)
 	{
-		printf("%c方胜利！",cp); 
-		system("pause");
-		system("cls");
-		print_board();
-		if(cp=='*') scorelist(256-(count+1)/2,cp);
-		else scorelist(256-(count-1)/2,'O');
+		std::cout << "Man VS AI";
+		AM.init_board_array();
 	}
-	for(i=1;i<5;i++){	
-		if(a+i<MAXIMUS&&b+i<MAXIMUS&&chess_board[a+i][b+i]==cp) y++;
-		else  break;
-	}//向右下检查  
-	for(i=1;i<5;i++){	
-		if(a-i>0&&b-i>0&&chess_board[a-i][b-i]==cp) y++;
-		else break;
-	}//向左上检查  
-	if(y>=5){
-		printf("%c方胜利！",cp); 
-		system("pause");
-		system("cls");
-		print_board();
-		if(cp=='*') scorelist(256-(count+1)/2,cp);
-		else scorelist(256-(count-1)/2,'O');
+	else if (function == 5)
+	{
+		std::cout << "AI VS AI";
 	}
-	for(i=1;i<5;i++){	
-		if(a+i<MAXIMUS&&b-i>0&&chess_board[a+i][b-i]==cp)z++;
-		else break;
-	}//向右上检查  
-	for(i=1;i<5;i++){	
-		if(a-i>0&&b+i<MAXIMUS&&chess_board[a-i][b+i]==cp)z++;
-		else break;
-	}//向左下检查  
-	if(z>=5){
-		printf("%c方胜利！",cp); 
-		system("pause");
-		system("cls");
-		print_board();
-		if(cp=='*') scorelist(256-(count+1)/2,cp);
-		else scorelist(256-(count-1)/2,'O');
+	gotoxy(65, 5);
+	std::cout << "press the SPACE to drop，use the DIRECTION key to move the cursor\n";
+	gotoxy(65, 7);
+	std::cout << "press ESC to restart the game(Ai VS Ai are not allowed)";
+	gotoxy(70, 10);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_RED);
+	if (function == 3)
+	{
+		std::cout << "Red number of chess pieces: ";
+		gotoxy(70, 12);
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE);
+		std::cout << "Blue number of chess piecs: ";
 	}
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+	draw_board();
+	cursor.X = 4 * ((NumOfLines - 1) / 2);
+	cursor.Y = NumOfLines - 1;
+	gotoxy(cursor.X, cursor.Y);
+	return true;
 }
-void scan(void)//人机玩家落子 
+
+inline bool my_isdigit(char ch)
 {
-	int input;
-	while(1){
-		input=getch();
-		if(input==27) exit(0);
-		else if(input==' '){
-			if (!(chess_board[(Cx-1)/2][Cy/2]==' ')) continue;
-			chess_board[(Cx-1)/2][Cy/2]='*';
-			system("cls");
-			print_board();
-			count+=2;
+	return std::isdigit(static_cast<unsigned char>(ch));
+}
+
+int Find_Demarcator(std::string Source)
+{
+	int i = 0;
+	while (true)
+	{
+		if (my_isdigit(Source[i]))
+			i++;
+		else
 			break;
-		}
-		else if(input==0xE0)//如果按下的是方向键，会填充两次输入，第一次为0xE0表示按下的是控制键  
-		{   
-			input=getch();//获得第二次输入信息  
-			switch(input)//判断方向键方向并移动光标位置  
-			{   
-				case 0x4B:Cy-=2;break; 
-				case 0x48:Cx-=2;break; 
-				case 0x4D:Cy+=2;break; 
-				case 0x50:Cx+=2;break; 
-			}
-			if(Cx<1) Cx=31;//如果光标位置越界则移动到对侧  
-			if(Cy<0) Cy=30;
-			if(Cx>31) Cx=1;  
-			if(Cy>30) y=0;
-			system("cls");
-			print_board();
-		}
-		else ontinue;
 	}
-	is_win(Cy/2,(Cx-1)/2,'*');	
+	i++;
+	return i;
 }
-void reverse(char row[],int len)//由于一行棋子具有对称性，故x=3,x=4的状态可翻转归结为x=0,x=1的状态
+
+int read_score(const char *Source)
 {
-	char temp;
-	int i,j;
-	for (i = 0, j = len - 1;i <= j;i++, j--){
+	int score = 0, temp;
+	for (int j = 0; j < 3; j++)
+	{
+		if (Source[j] == ' ')
+			return score;
+		if (j != 0 && Source[j] == '0')
+			score *= 10;
+		else
+		{
+			temp = Source[j] - '0';
+			score = score*10 + temp;
+		}
+	}
+	return score;
+}
+
+bool Sort_Scorelist()
+{
+	int count = 0;
+	std::fstream f("winnerlist.txt", std::ios::out | std::ios::in);
+	if (f.fail())
+		throw std::runtime_error("output file fail!");
+	while (!f.eof())
+		if (f.get() == '\n')
+			count++;
+	f.close();
+	f.open("winnerlist.txt", std::ios::out | std::ios::in);
+	char **p = NULL;
+	p = new char *[count];
+	for (int i = 0; i < count; i++)
+		p[i] = new char[100];
+	int TempNumOfRow = 0;
+	while (!f.eof() && TempNumOfRow < count)
+	{
+		for (int j = 0; j < 100; j++)
+		{
+			p[TempNumOfRow][j] = f.get();
+			if (p[TempNumOfRow][j] == '\n')
+			{
+				p[TempNumOfRow][j + 1] = '\0';
+				break;
+			}
+		}
+		TempNumOfRow++;
+	}
+	for (int i = 0; i < count; i++)
+	{
+		for (int j = i + 1; j < count; j++)
+		{
+			if (read_score(p[i]) < read_score(p[j]))
+			{
+				char *temp = p[i];
+				p[i] = p[j];
+				p[j] = temp;
+			}
+		}
+	}
+	f.close();
+	f.open("winnerlist.txt", std::ios::out);
+	f.close();
+	f.open("winnerlist.txt", std::ios::out | std::ios::in);
+	for (int i = 0; i < count; i++)
+		for (int j = 0; j < strlen(p[i]); j++)
+			f.put(p[i][j]);
+	for (int i = 0; i < count; i++)
+		delete[] p[i];
+	delete[]p;
+	f.close();
+	return true;
+}
+
+bool Output(void)
+{
+	system("cls");
+	std::fstream outf("winnerlist.txt", std::ios::out | std::ios::in);
+	if (outf.fail())
+		throw std::runtime_error("output file fail!");
+	std::cout << "Rank   \t\tScore\t\tColor\t\tName\n";
+	char s[100];
+	int rank = 1;
+	while (!outf.eof())
+	{
+		outf.getline(s, 100);
+		std::string str = "";
+		for (int i = 0; s[i] != '\0'; ++i)
+			str += s[i];
+		try {
+			int score_point = Find_Demarcator(str), LengthOfRow = str.size(), player_point;
+			std::string score, name;
+			score = str.substr(0, score_point);
+			std::string str2 = str.substr(score_point, LengthOfRow);
+			player_point = Find_Demarcator(str2);
+			std::string player = str2.substr(0, player_point);
+			name = str2.substr(player_point, str2.size());
+			printf("%-5d\t\t%-5s\t\t%1s\t\t%-18s\n", rank++, score.c_str(), player.c_str(), name.c_str());
+		}
+		catch (...) { break; }
+	}
+	outf.close();
+	return true;
+}
+
+bool Input(int score, int player)
+{
+	std::fstream inf("winnerlist.txt", std::ios::app);
+	std::string tempname, tempscore = "";
+	while (true)
+	{
+		std::cin >> tempname;
+		getchar();
+		if (tempname != ""&&tempname.find(' ') == std::string::npos)
+			break;
+		gotoxy(70,22);
+		std::cout << "input again: ";
+	}
+	if (inf.fail())
+		throw std::runtime_error("Input file fail!");
+	while (score / 10 != 0 || score % 10 != 0)
+	{
+		tempscore.push_back(score % 10 + '0');
+		score /= 10;
+	}
+	std::reverse(tempscore.begin(), tempscore.end());
+	for (int i = 0; i < tempscore.size(); ++i)
+		inf.put(tempscore.at(i));
+	inf.put(' ');
+	if (player == 1)
+		inf.put('R');
+	else if (player == 2)
+		inf.put('B');
+	else
+		inf.put('M');
+	inf.put(' ');
+	for (int i = 0; i < tempname.size(); ++i)
+		inf.put(tempname.at(i));
+	inf.put('\n');
+	inf.close();
+	return true;
+}
+
+bool Scorelist(int score, int player)
+{
+	gotoxy(60, 19);
+	std::cout << "Your scores are " << score;
+	gotoxy(60, 20);
+	std::cout << "Please input Your Name: ";
+	gotoxy(60, 22);
+	Input(score, player);
+	Sort_Scorelist();
+	Output();
+	system("pause");
+	return true;
+}
+
+void gotoxy(int x, int y)
+{
+	COORD coord;
+	coord.X = x;
+	coord.Y = y;
+	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+}
+
+inline bool Chess::dropout(int x, int y)
+{
+	return chess_board[y][x] = 1;
+}
+
+int CalSumPieces(Chess T)
+{
+	int sum = 0;
+	for (int i = 0; i < NumOfLines; ++i)
+		for (int j = 0; j < NumOfLines; ++j)
+			if (T.chess_board[i][j])
+				sum++;
+	return sum;
+}
+
+bool ShowNumOfPieces(int x, int y, int func)
+{
+	gotoxy(100, 10);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_RED);
+	if (func == 1)
+	{
+		std::cout << CalSumPieces(Red);
+		gotoxy(100, 12);
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE);
+		std::cout << CalSumPieces(Blue);
+	}
+	/*else
+	{
+		std::cout << CalSumPieces(Man);
+		gotoxy(100, 12);
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE);
+		std::cout << CalSumPieces(AI);
+	}*/
+	gotoxy(x, y);
+	return true;
+}
+
+bool is_full(void)
+{
+	if (CalSumPieces(Red) + CalSumPieces(Blue) == 225)
+		return true;
+	return false;
+}
+
+bool Chess::win() const
+{
+	int i, j, count;
+	for (i = 0; i <= NumOfLines; i++)
+	{ //judge by row
+		j = count = 0;
+		while (count < 5 && j <= NumOfLines)
+		{
+			if ( my_abs(chess_board[i][j]) )
+				count++;
+			else
+				count = 0;
+			j++;
+		}
+		huo5
+	}
+	for (j = 0; j <= NumOfLines; j++)
+	{ //judge by column
+		i = count = 0;
+		while (count < 5 && i <= NumOfLines)
+		{
+			if (chess_board[i][j])
+				count++;
+			else
+				count = 0;
+			i++;
+		}
+		huo5
+	}
+	for (i = 0; i < NumOfLines - 3; i++)
+	{ //judge by declivity
+		j = count = 0;
+		while (count < 5 && j < NumOfLines - 3)
+		{
+			if (chess_board[i + count][j + count])
+				count++;
+			else
+			{
+				count = 0;
+				j++;
+			}
+		}
+		huo5
+	}
+	for (i = 4; i <= NumOfLines; i++) //i=4 cause starting judge from the 4th row
+	{								   //judge by acclivity
+		j = count = 0;
+		while (count < 5 && j < NumOfLines - 3)
+		{ //j<ColumnsOfBoard-3 because stop judge at 12th column if there's no dropout
+			if (chess_board[i - count][j + count])
+				count++;
+			else
+			{
+				count = 0;
+				j++;
+			}
+		}
+		huo5
+	}
+	return 0;
+}
+
+bool Chess::AM_Win(int player)
+{
+	int i, j, count;
+	if (player == 1)
+	{
+		for (i = 0; i <= NumOfLines; i++)
+		{ //judge by row
+			j = count = 0;
+			while (count < 5 && j <= NumOfLines)
+			{
+				if (my_abs(chess_board[i][j]) == 1)
+					count++;
+				else
+					count = 0;
+				j++;
+			}
+			huo5
+		}
+		for (j = 0; j <= NumOfLines; j++)
+		{ //judge by column
+			i = count = 0;
+			while (count < 5 && i <= NumOfLines)
+			{
+				if (my_abs(chess_board[i][j]) == 1)
+					count++;
+				else
+					count = 0;
+				i++;
+			}
+			huo5
+		}
+		for (i = 0; i < NumOfLines - 3; i++)
+		{ //judge by declivity
+			j = count = 0;
+			while (count < 5 && j < NumOfLines - 3)
+			{
+				if (my_abs(chess_board[i + count][j + count]) == 1)
+					count++;
+				else
+				{
+					count = 0;
+					j++;
+				}
+			}
+			huo5
+		}
+		for (i = 4; i <= NumOfLines; i++) //i=4 cause starting judge from the 4th row
+		{								   //judge by acclivity
+			j = count = 0;
+			while (count < 5 && j < NumOfLines - 3)
+			{ //j<ColumnsOfBoard-3 because stop judge at 12th column if there's no dropout
+				if (my_abs(chess_board[i - count][j + count]) == 1)
+					count++;
+				else
+				{
+					count = 0;
+					j++;
+				}
+			}
+			huo5
+		}
+	}
+	else
+	{
+		for (i = 0; i <= NumOfLines; i++)
+		{ //judge by row
+			j = count = 0;
+			while (count < 5 && j <= NumOfLines)
+			{
+				if (my_abs(chess_board[i][j]) == 2)
+					count++;
+				else
+					count = 0;
+				j++;
+			}
+			huo5
+		}
+		for (j = 0; j <= NumOfLines; j++)
+		{ //judge by column
+			i = count = 0;
+			while (count < 5 && i <= NumOfLines)
+			{
+				if (my_abs(chess_board[i][j]) == 2)
+					count++;
+				else
+					count = 0;
+				i++;
+			}
+			huo5
+		}
+		for (i = 0; i < NumOfLines - 3; i++)
+		{ //judge by declivity
+			j = count = 0;
+			while (count < 5 && j < NumOfLines - 3)
+			{
+				if (my_abs(chess_board[i + count][j + count]) == 2)
+					count++;
+				else
+				{
+					count = 0;
+					j++;
+				}
+			}
+			huo5
+		}
+		for (i = 4; i <= NumOfLines; i++) //i=4 cause starting judge from the 4th row
+		{								   //judge by acclivity
+			j = count = 0;
+			while (count < 5 && j < NumOfLines - 3)
+			{ //j<ColumnsOfBoard-3 because stop judge at 12th column if there's no dropout
+				if (my_abs(chess_board[i - count][j + count]) == 2)
+					count++;
+				else
+				{
+					count = 0;
+					j++;
+				}
+			}
+			huo5
+		}
+	}
+	return false;
+}
+
+int ai2man_win()
+{
+	int i, j, count;
+	for (i = 0; i <= NumOfLines; i++)
+	{ //judge by row
+		j = count = 0;
+		while (count < 5 && j <= NumOfLines)
+		{
+			if (my_abs(chess_board[i][j]) == 1)	count++;
+			else count = 0;
+			j++;
+		}
+		huo5
+	}
+	for (j = 0; j <= NumOfLines; j++)
+	{ //judge by column
+		i = count = 0;
+		while (count < 5 && i <= NumOfLines)
+		{
+			if (my_abs(chess_board[i][j]) == 1) count++;
+			else count = 0;
+			i++;
+		}
+		huo5
+	}
+	for (i = 0; i < NumOfLines - 3; i++)
+	{ //judge by declivity
+		j = count = 0;
+		while (count < 5 && j < NumOfLines - 3)
+		{
+			if (my_abs(chess_board[i + count][j + count]) == 1) count++;
+			else { count = 0; j++; }
+		}
+		huo5
+	}
+	for (i = 4; i <= NumOfLines; i++) //i=4 cause starting judge from the 4th row
+	{								   //judge by acclivity
+		j = count = 0;
+		while (count < 5 && j < NumOfLines - 3)
+		{ //j<ColumnsOfBoard-3 because stop judge at 12th column if there's no dropout
+			if (my_abs(chess_board[i - count][j + count]) == 1) count++;
+			else{count = 0;j++;}
+		}
+		huo5
+	}
+	for (i = 0; i <= NumOfLines; i++)
+	{ //judge by row
+		j = count = 0;
+		while (count < 5 && j <= NumOfLines)
+		{
+			if (my_abs(chess_board[i][j]) == 2) count++;
+			else count = 0;
+	    	j++;
+		}
+		huo5_1
+	}
+	for (j = 0; j <= NumOfLines; j++)
+	{ //judge by column
+		i = count = 0;
+		while (count < 5 && i <= NumOfLines)
+		{
+			if (my_abs(chess_board[i][j]) == 2)	count++;
+			else count = 0;
+			i++;
+		}
+		huo5_1
+	}
+	for (i = 0; i < NumOfLines - 3; i++)
+	{ //judge by declivity
+		j = count = 0;
+		while (count < 5 && j < NumOfLines - 3)
+		{
+			if (my_abs(chess_board[i + count][j + count]) == 2) count++;
+			else { count = 0; j++; }
+		}
+		huo5_1
+	}
+	for (i = 4; i <= NumOfLines; i++) //i=4 cause starting judge from the 4th row
+	{								   //judge by acclivity
+		j = count = 0;
+		while (count < 5 && j < NumOfLines - 3)
+		{ //j<ColumnsOfBoard-3 because stop judge at 12th column if there's no dropout
+			if (my_abs(chess_board[i - count][j + count]) == 2) count++;
+			else { count = 0; j++; }
+		}
+		huo5_1
+	}
+	return 0;
+}
+
+bool after_win(int player)
+{
+	gotoxy(60, 16);
+	if (player == 1)
+	{
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_RED);
+		std::cout << "Red Win!!!";
+	}
+	else if (player == 2)
+	{
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE);
+		std::cout << "Blue Win!!!";
+	}
+	else if (player == 3)
+		std::cout << "You Win!!!";
+	gotoxy(60, 18);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+	std::cout << "Press the ENTER to leave your name";
+	while (_getch() != 13);
+	return true;
+}
+
+bool reverse(int *row, int len)
+{
+	int temp, i, j;
+	for (i = 0, j = len - 1; i <= j; i++, j--)
+	{
 		temp = row[i];
 		row[i] = row[j];
 		row[j] = temp;
 	}
+	return true;
 }
-int score(char row[], int x)//'O'代表白棋，'*'代表黑棋，人执黑，机器执白
-{                                           //每个if分支后的注释，'_'代表空格（即可落子处），'O'为白棋，'*'为黑棋
-	if (x > 2) {                        //'?'表示已可给分，该位置状态不必获取
-		reverse(row,5);
-		x = 4 - x;                  //紧接着的return，返回的便是对该位置的评分
-	}
-	switch (x){
-	case 0:{
-		if (row[1]=='O'&&(row[2]=='O'||row[2]==' ') && (row[3] == 'O' || row[3] == ' ') && (row[4] == 'O' || row[4] == ' ')) {
-			if (row[x + 2]==' ')//_O_??
-				return(15);
-			else if (row[x + 3] == ' ') //_OO_?
-				return(50);
-			else if (row[x + 4] == ' ')//_OOO_
-				return(90);
-			else 	//_OOOO
-				return(1000);
-		}
-		else if (row[1] == '*' && (row[2] == '*' || row[2] == ' ') && (row[3] == '*' || row[3] == ' ') && (row[4] == '*' || row[4] == ' ')) {
-			if (row[x + 2] == ' ')//_*_??
-				return(5);
-			else if (row[x + 3] == ' ') 	//_**_?
-				return(30);
-			else if (row[x + 4] == ' ') //_***_
-				return(70);
-			else //_****
-				return(500);
-		}
-	};break;
-	case 1:{
-		if ((row[0] == 'O' || row[0] == ' ') && (row[2] == 'O' || row[2] == ' ') && (row[3] == 'O' || row[3] == ' ') && (row[4] == 'O' || row[4] == ' ')) {
-			if (row[0] == 'O'){
-				if (row[2] == ' ')	//O_ _??
-					return(15);
-				else if (row[3] == ' ')//O_O_??
-					return(50);
-				else if (row[4] == ' ')	//O_OO_
-					return(90);
-				else //O_OOO
-					return(1000);
-			}
-			else if (row[2] == ' ') //_ _ _??
-				return(0);
-			else if (row[3] == ' ')	//_ _O_?
-				return(15);
-			else if (row[4] == ' ')	//_ _OO_
-				return(50);
-			else //_ _OOO
-				return(80);
-		}
-		else if ((row[0] == '*' || row[0] == ' ') && (row[2] == '*' || row[2] == ' ') && (row[3] == '*' || row[3] == ' ') && (row[4] == '*' || row[4] == ' ')) {
-			if (row[0] == '*') {
-				if (row[2] == ' ') 	//*_ _??
-					return(5);
-				else if (row[3] == ' ') //*_*_?
-					return(30);
-				else if (row[4] == ' ')//*_**_
-					return(70);
-				else //*_***
-					return(500);
-			}
-			else if (row[2] == ' ') //_ _ _??
-				return(0);
-			else if (row[3] == ' ') //_ _*_?
-				return(5);
-			else if (row[4] == ' ')//_ _**_
-				return(30);
-			else//_ _***
-				return(60);
-		}
-	};break;
-	case 2: {
-		if ((row[0] == 'O' || row[0] == ' ') && (row[1] == 'O' || row[2] == ' ') && (row[3] == 'O' || row[3] == ' ') && (row[4] == 'O' || row[4] == ' ')) {
-			if (row[1] == 'O') {
-				if (row[3] == 'O') {
-					if (row[0] == 'O') 
-						if (row[4] == 'O') //OO_OO
-							return(1000);
-						else 
-							return(90);		//OO_O_
-					}
-					else {
-						if (row[4] == 'O') //_O_OO
-							return(90);
-						else //_O_O_
-							return(50);
-					}
-				}
-				else {
-					if (row[0] == 'O')	//OO_ _?
-						return(40);
-					else //_O_ _?
-						return(15);
-				}
-			}
-			else {
-				if (row[3] == 'O') {
-					if(row[4] == 'O')//_ _ _OO
-						return(40);
-					else//_ _ _O_
-						return(15);
-				}
-			}
-		}
-		else if ((row[0] == '*' || row[0] == ' ') && (row[1] == '*' || row[2] == ' ') && (row[3] == '*' || row[3] == ' ') && (row[4] == '*' || row[4] == ' ')) {
-			if (row[1] == '*') {
-				if (row[3] == '*') {
-					if (row[0] == '*') {
-						if (row[4] == '*') //**_**
-							return(500);
-						else//**_*_
-							return(70);
-					 }
-					else{
-						if (row[4] == '*')//_*_**
-							return(70);
-						else//_*_*_
-							return(30);
-					}
-				}
-				else{
-					if (row[0] == '*') //**_ _ _
-						return(20);
-					else //_*_ _?
-						return(5);
-				}
-			}
-			else 
-				if (row[3] == '*') {		//_ _ _**
-					if (row[4] == '*') return(20);
-					else //_ _ _*_
-						return(5);
-				}
-			}
-		}
-	};break;
-	}
-	return(0);
-} 
-int sense_row(int x, int y)//横向截取,如下列一排示例中，x，y所代表的位置是第五个O
-{                                  //[OOOOO]OOOO,O[OOOOO]OOO，OO[OOOOO]OO......如此这般依次截取，其余方向类似
 
-	int sum = 0, i, j;
-	char row[5];
-	for (i = x - 4;i <= x;i++) {
-		if (!(i >= 0 && i + 4 <= 15))	continue;
-		else {
-			for (j = 0;j < 5;j++) 
-				row[j] = chess_board[y][i + j];
-			sum += score(row, x - i);
+bool man2man_move_drop(int player)
+{
+	int i, state, direction;
+	while (state = _getch())
+	{
+		switch (state)
+		{
+		case 27://ESC 
+			std::cin.sync();
+			system("cls");
+			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_RED);
+			startgame();
+			break;
+		case 32: //use the space dropping
+			if (!Red.chess_board[cursor.X / 4][cursor.Y / 2] && !Blue.chess_board[cursor.X / 4][cursor.Y / 2])
+				draw_dropout(player);
+			else
+				continue;
+			if (player == 1)
+				Red.chess_board[cursor.X / 4][cursor.Y / 2] = 1;
+			else
+				Blue.chess_board[cursor.X / 4][cursor.Y / 2] = 1;
+			ShowNumOfPieces(cursor.X, cursor.Y, 1);
+			if (is_full())
+			{
+				state = 27;
+				continue;
+			}
+			return 1;
+		case 224: //move the cursor
+			direction = _getch();
+			switch (direction)
+			{
+			case 72: //up
+				for (i = 1; cursor.Y - 2 * i >= 0; i++)
+					if (!Red.chess_board[cursor.X / 4][(cursor.Y - 2 * i) / 2] && !Blue.chess_board[cursor.X / 4][(cursor.Y - 2 * i) / 2])
+					{
+						cursor.Y -= 2 * i;
+						break;
+					}
+				break;
+			case 80: //down
+				for (i = 1; cursor.Y + 2 * i <= (NumOfLines - 1) * 2; i++)
+				{
+					if (!Red.chess_board[cursor.X / 4][(cursor.Y + 2 * i) / 2] && !Blue.chess_board[cursor.X / 4][(cursor.Y + 2 * i) / 2])
+					{
+						cursor.Y += 2 * i;
+						break;
+					}
+				}
+				break;
+			case 75: //left
+				for (i = 1; cursor.X - 4 * i >= 0; i++)
+				{
+					if (!Red.chess_board[(cursor.X - 4 * i) / 4][cursor.Y / 2] && !Blue.chess_board[(cursor.X - 4 * i) / 4][cursor.Y / 2])
+					{
+						cursor.X -= 4 * i;
+						break;
+					}
+				}
+				break;
+			case 77: //right
+				for (i = 1; cursor.X + 4 * i <= (NumOfLines - 1) * 4; i++)
+				{
+					if (!Red.chess_board[(cursor.X + 4 * i) / 4][cursor.Y / 2] && !Blue.chess_board[(cursor.X - 4 * i) / 4][cursor.Y / 2])
+					{
+						cursor.X += 4 * i;
+						break;
+					}
+				}
+				break;
+			}
+			gotoxy(cursor.X, cursor.Y);
 		}
 	}
-	return(sum);
+	return true;
 }
-int sense_col(int x, int y)
+
+bool draw_board()
+{ // draw the chessboard
+	gotoxy(0, 0);
+	std::cout << "┏━━━┯━━━┯━━━┯━━━┯━━━┯━━━┯━━━┯━━━┯━━━┯━━━┯━━━┯━━━┯━━━┯━━━┓\n";
+	for (int i = 0; i < NumOfLines - 2; i++)
+	{
+		std::cout << "┃   │   │   │   │   │   │   │   │   │   │   │   │   │   ┃\n";
+		std::cout << "┠───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼───┨\n";
+	}
+	std::cout << "┃   │   │   │   │   │   │   │   │   │   │   │   │   │   ┃\n";
+	std::cout << "┗━━━┷━━━┷━━━┷━━━┷━━━┷━━━┷━━━┷━━━┷━━━┷━━━┷━━━┷━━━┷━━━┷━━━┛\n";
+	return true;
+}
+
+bool draw_dropout(int player)
 {
-	int sum = 0, i, j;
-	char row[5];
-	for (i = y - 4;i <= y;i++) {
-		if (!(i >= 0 && i + 4 <= 15)) 
+	if (player == 1)
+	{
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_RED);
+		std::cout << "●\b";
+	}
+	else if (player == 2)
+	{
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE);
+		std::cout << "◆\b";
+	}
+	return true;
+}
+
+bool ManVsMan()
+{
+	Red.init_board_array();
+	Blue.init_board_array();
+	init_board_interface(3);
+	while (true)
+	{
+		man2man_move_drop(1);//Red drop 1
+		if (Red.win())
+		{
+			after_win(1);
+			Scorelist((NumOfLines*NumOfLines) - CalSumPieces(Red), 1);
+			break;
+		}
+		man2man_move_drop(2);//Blue drop 2
+		if (Blue.win())
+		{
+			after_win(2);
+			Scorelist((NumOfLines*NumOfLines) - CalSumPieces(Blue), 2);
+			break;
+		}
+	}
+	return true;
+}
+
+int draw_pieces(int i, int j)
+{
+	gotoxy(i * 4, j * 2);
+	if (chess_board[i][j] == 1)
+	{
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_RED);
+		std::cout << "●\b";
+		return 0;
+	}
+	if (chess_board[i][j] == 2)
+	{
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE);
+		std::cout << "●\b";
+		return 0;
+	}
+	return 0;
+}
+
+void init_board_array()
+{
+	if (player_state != 1 && player_state != 2)
+		return;
+	player0 = player_state;
+	int i, j;
+	for (i = 0; i < NumOfLines; i++)
+		for (j = 0; j < NumOfLines; j++)
+			chess_board[i][j] = 0;
+}
+
+bool inboard(int row, int col)
+{
+	if (row < 0 || row >= NumOfLines)return false;
+	return col >= 0 && col < NumOfLines;
+}
+
+bool same(int row, int col, int key)
+{
+	if (!inboard(row, col))return false;
+	return (chess_board[row][col] == key || chess_board[row][col] + key == 0);
+}
+
+int num(int row, int col, int u)
+{
+	int i = row + dx[u], j = col + dy[u], sum = 0, ref = chess_board[row][col];
+	if (ref == 0)return 0;
+	while (same(i, j, ref))sum++, i += dx[u], j += dy[u];
+	return sum;
+}
+
+int live4(int row, int col)//live 4 's number
+{
+	int key = chess_board[row][col], sum = 0, i, u;
+	for (u = 0; u < 4; u++)//4 directions 
+	{
+		int sumk = 1;
+		sumkadd off sumksub off
+			if (sumk == 4)sum++;
+	}
+	return sum;
+}
+int chong4(int row, int col)
+{
+	int key = chess_board[row][col], sum = 0, i, u;
+	for (u = 0; u < 8; u++)
+	{
+		int sumk = 0;
+		bool flag = true;
+		for (i = 1; samekey || flag; i++)
+		{
+			if (!samekey)
+			{
+				if (flag&&chess_board[row + dx[u] * i][col + dy[u] * i])sumk -= 10;
+				flag = false;
+			}
+			sumk++;
+		}
+		if (!inboard(row + dx[u] * --i, col + dy[u] * i))
 			continue;
-		else{
-			for (j = 0;j < 5;j++) 
-				row[j] = chess_board[i + j][x];
-			sum += score(row, y - i);
+		sumksub
+			if (sumk == 4)sum++;
+	}
+	return sum - live4(row, col) * 2;
+}
+int live3(int row, int col)
+{
+	int key = chess_board[row][col], sum = 0, i, u;
+	for (u = 0; u < 4; u++)//san lian de huo san
+	{
+		int sumk = 1;
+		sumkadd off i++; off;
+		sumksub off i--; off;
+		if (sumk == 3)sum++;
+	}
+	for (u = 0; u < 8; u++)//8个方向，每个方向最多1个非三连的活三
+	{
+		int  sumk = 0;
+		bool flag = true;
+		for (i = 1; samekey || flag; i++)//成活四点的方向
+		{
+			if (!samekey)
+			{
+				if (flag&&chess_board[row + dx[u] * i][col + dy[u] * i])sumk -= 10;
+				flag = false;
+			}
+			sumk++;
+		}
+		off
+			if (chess_board[row + dx[u] * --i][col + dy[u] * i] == 0)continue;
+		sumkadd off
+			if (sumk == 3)sum++;
+	}
+	return sum;
+}
+bool overline(int row, int col)//长连禁手
+{
+	bool flag = false;
+	int u;
+	for (u = 0; u < 4; u++)if (num(row, col, u) + num(row, col, u + 4) > 4)flag = true;
+	return flag;
+}
+bool ban(int row, int col)//判断落子后是否成禁手
+{
+	if (same(row, col, 2))return false;//白方无禁手
+	bool flag = live3(row, col) > 1 || overline(row, col) || live4(row, col) + chong4(row, col) > 1;
+	return flag;
+}
+
+bool end_(int row, int col)//落子之后是否游戏结束
+{
+	int u;
+	for (u = 0; u < 4; u++)if (num(row, col, u) + num(row, col, u + 4) >= 4)is_end = true;
+	if (is_end)return true;
+	is_end = ban(row, col);
+	return is_end;
+}
+
+void ai_message(int state)
+{
+	int x = cursor.X, y = cursor.Y;
+	gotoxy(70, 18);
+	if (state == 1) std::cout << "AI考虑中！";
+	else std::cout << "AI已落子！";
+}
+
+void ai_drop(int row, int col)
+{
+	if (player_state == player0)chess_board[row][col] = 1;//1代表红棋
+	else chess_board[row][col] = 2;//2代表蓝棋
+	draw_pieces(row, col);
+	ai_message(2);//提示AI已经落子
+	gotoxy(row * 4, col * 2);
+	if (ban(row, col) || end_(row, col))
+	{
+		gotoxy(60, 16);
+		if (player0 == 1 || player_state != ais)
+		{
+			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_RED);
+			std::cout << "红方胜利！！！";
+		}
+		else
+		{
+			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE);
+			std::cout << "蓝方胜利！！！";
+		}
+		system("pause");
+	}
+
+}
+
+inline bool ok(int row, int col)
+{
+	return inboard(row, col) && (chess_board[row][col] == 0);
+}
+
+int point(int row, int col)//非负分值
+{
+	if (ban(row, col))return 0;
+	if (end_(row, col))
+	{
+		is_end = false;
+		return 10000;
+	}
+	int ret = live4(row, col) * 1000 + (chong4(row, col) + live3(row, col)) * 100, u;
+	for (u = 0; u < 8; u++)if (chess_board[row + dx[u]][col + dy[u]])ret++;
+	return ret;
+}
+
+int AI3(int p2)
+{
+	int i, j;
+	int keyp = -100000, temppoint;
+	for (i = 0; i < NumOfLines; i++)
+		for (j = 0; j < NumOfLines; j++)
+		{
+			if (!ok(i, j))continue;
+			chess_board[i][j] = player0;
+			temppoint = point(i, j);
+			if (temppoint == 0)
+			{
+				chess_board[i][j] = 0;
+				continue;
+			}
+			if (temppoint == 10000)
+			{
+				chess_board[i][j] = 0;
+				return 10000;
+			}
+			chess_board[i][j] = 0;
+			if (temppoint - p2 * 2 > keyp)keyp = temppoint - p2 * 2;//第三层取极大
+		}
+	return keyp;
+}
+
+int AI2()
+{
+	int i, j;
+	int keyp = 100000, temppoint;
+	for (i = 0; i < NumOfLines; i++)
+		for (j = 0; j < NumOfLines; j++)
+		{
+			if (!ok(i, j))continue;
+			chess_board[i][j] = 3 - player0;
+			temppoint = point(i, j);
+			if (temppoint == 0)
+			{
+				chess_board[i][j] = 0;
+				continue;
+			}
+			if (temppoint == 10000)
+			{
+				chess_board[i][j] = 0;
+				return -10000;
+			}
+			temppoint = AI3(temppoint);
+			chess_board[i][j] = 0;
+			if (temppoint < keyp)
+				keyp = temppoint;//第二层取极小
+		}
+	return keyp;
+}
+
+void AI()
+{
+	ai_message(1);
+	if (chess_board[7][7] == 0)	return ai_drop(7, 7);
+	int i, j;
+	int keyp = -100000, keyi, keyj, temppoint;
+	for (i = 0; i < NumOfLines; i++)
+	{
+		for (j = 0; j < NumOfLines; j++)
+		{
+			if (!ok(i, j))continue;
+			chess_board[i][j] = player0;
+			temppoint = point(i, j);
+			if (temppoint == 0)
+			{
+				chess_board[i][j] = 0;
+				continue;
+			}//剪枝,不选择禁手点和无效点
+			if (temppoint == 10000)
+				return ai_drop(i, j);
+			temppoint = AI2();
+			chess_board[i][j] = 0;
+			if (temppoint > keyp)
+				keyp = temppoint, keyi = i, keyj = j;//第一层取极大
 		}
 	}
-	return(sum);
+	return ai_drop(keyi, keyj);
 }
-int sense_right_bias(int x, int y)
+
+bool player_drop()
 {
-	int sum = 0, i, j;
-	char row[5];
-	for (i = -4;i <= 0;i++) {
-		if (!(y + i >= 0 && x + i >= 0 && y + i + 4 <= 15 && x + i + 4 <= 15)) continue;
-		else{
-			for (j = 0;j < 5;j++) 
-				row[j] = chess_board[y + i + j][x + i + j];
-			sum += score(row, -i);
+	int i, state, direction;
+	while (state = _getch())
+	{
+		switch (state)
+		{
+		case 27://ESC键可随时退出当前游戏
+			system("cls");
+			startgame();
+			//TODO
+			break;
+		case 32: //按下空格先检验再落子再绘出棋子
+			if (!chess_board[cursor.X / 4][cursor.Y / 2])
+			{
+				if (player_state == player0)chess_board[cursor.X / 4][cursor.Y / 2] = 1;//1代表刚刚下了红棋
+				else chess_board[cursor.X / 4][cursor.Y / 2] = 2;//2代表刚刚下了蓝棋
+				draw_pieces(cursor.X / 4, cursor.Y / 2);
+			}
+			else continue;
+			return true;
+		case 224: //move the cursor
+			direction = _getch();
+			switch (direction)
+			{
+			case 72: //up
+				for (i = 1; cursor.Y - 2 * i >= 0; i++)
+					if (!chess_board[cursor.X / 4][(cursor.Y - 2 * i) / 2])
+					{
+						cursor.Y -= 2 * i;
+						break;
+					}
+				break;
+			case 80: //down
+				for (i = 1; cursor.Y + 2 * i <= (NumOfLines - 1) * 2; i++)
+				{
+					if (!chess_board[cursor.X / 4][(cursor.Y + 2 * i) / 2])
+					{
+						cursor.Y += 2 * i;
+						break;
+					}
+				}
+				break;
+			case 75: //left
+				for (i = 1; cursor.X - 4 * i >= 0; i++)
+				{
+					if (!chess_board[(cursor.X - 4 * i) / 4][cursor.Y / 2])
+					{
+						cursor.X -= 4 * i;
+						break;
+					}
+				}
+				break;
+			case 77: //right
+				for (i = 1; cursor.X + 4 * i <= (NumOfLines - 1) * 4; i++)
+				{
+					if (!chess_board[(cursor.X + 4 * i) / 4][cursor.Y / 2])
+					{
+						cursor.X += 4 * i;
+						break;
+					}
+				}
+				break;
+			}
+			gotoxy(cursor.X, cursor.Y);
 		}
 	}
-	return(sum);
+	return true;
 }
-int sense_left_bias(int x, int y)
+
+bool ManVsAI(int a)
 {
-	int sum = 0, i, j;
-	char row[5];
-	for (i = -4;i <= 0;i++){
-		if (!(y - i <= 15 && x + i >= 0 && y - i - 4 >= 0 && x + i + 4 <= 15)) continue;
-		else{
-			for (j = 0;j < 5;j++) 
-				row[j] = chess_board[y - i - j][x + i + j];
-			sum += score(row, -i);
-		}
-	}
-	return(sum);
-}
-void sense(void)//将四个方向上的评分综合并记录
-{
-	int x, y, sum = 0;
-	initial_positions();
-	for (y = 0;y < 16;y++)
-		for (x = 0;x < 16;x++) {
-			if (chess_board[y][x] != ' ') 	continue;
-			sum += sense_col(x, y);
-			sum += sense_row(x, y);
-			sum += sense_left_bias(x, y);
-			sum += sense_right_bias(x, y);
-			if (sum != 0) {
-				positions[position_order].score = sum;
-				positions[position_order].x = x;
-				positions[position_order].y = y;
-				position_order++;
-				sum = 0;
+	player_state = a;
+	player0 = player_state;
+	init_board_interface(2);
+	init_board_array();
+	is_end = false;
+	draw_board();
+	gotoxy(28, 14);//(28/4,14/2)为棋盘中心
+	while (!is_end)
+	{
+		if (player_state == ais)AI();
+		else player_drop();
+		if (ai2man_win())
+		{
+			if (a == 1 && ai2man_win() == 1 || (a == 2 && ai2man_win() == 2)) restartgame();
+			else if (a == 1 && ai2man_win() == 2)
+			{
+				gotoxy(60, 16);
+				std::cout << "You Win!";
+				gotoxy(60, 18);
+				SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+				std::cout << "Press the ENTER to leave your name";
+				int res = 0;
+				for (int i = 0; i < NumOfLines; i++)
+					for (int j = 0; j < NumOfLines; j++)
+						if (chess_board[i][j] == 2)
+							res++;
+				while (_getch() != 13);			
+				Scorelist(res, 3);
+				startgame();
+			}
+			else if (a == 2 && ai2man_win() == 1)
+			{
+				gotoxy(60, 16);
+				std::cout << "You Win!";
+				gotoxy(60, 18);
+				SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+				std::cout << "Press the ENTER to leave your name";
+				while (_getch() != 13);
+				int res = 0;
+				for (int i = 0; i < NumOfLines; i++)
+					for (int j = 0; j < NumOfLines; j++)
+						if (chess_board[i][j] == 1)
+							res++;
+				Scorelist(res, 3);
+				startgame();
 			}
 		}
+		player_state = 3 - player_state;
+	}
+	return true;
 }
-void think_act(void)
+
+bool full()
 {
-	int max=0,max_order,i;
-	for (i=0;i<position_order;i++) 
-		if (positions[i].score>max) {
-			max=positions[i].score;
-			max_order=i;
+	for (int i = 0; i < NumOfLines; i++)
+		for (int j = 0; j < NumOfLines; j++)
+			if (!chess_board[i][j])
+				return false;
+	return true;
+}
+
+bool AIvsAI()
+{
+	player_state = 1;
+	player0 = player_state;
+	init_board_interface(5);
+	init_board_array();
+	is_end = false;
+	draw_board();
+	gotoxy(28, 14);//(28/4,14/2)为棋盘中心
+	while (!is_end)
+	{
+		if (full())
+		{
+			restartgame();
+			break;
 		}
-	chess_board[positions[max_order].y][positions[max_order].x]='O';
-	is_win(positions[max_order].x,positions[max_order].y,'O');
+		AI();
+		player_state = 3 - player_state;
+	}
+	restartgame();
+	return true;
 }
-void runpcgame()//人机模式 
+
+void restartgame(void)
 {
-	initialize_board();
-	print_board();
-	while (!is_full()){
-		scan();
-		sense();
-		think_act();
-		system("cls");
-		print_board();
+	gotoxy(60, 18);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+	std::cout << "Press ENTER to restart game ";
+	while (_getch() != 13);
+	std::cin.sync();
+	startgame();
+}
+
+void startgame(void)
+{
+	system("cls");
+	std::cin.sync();
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
+	std::cout << "--------------------------------------------------------\n";
+	std::cout << "|                  Five In A Row                       |\n";
+	std::cout << "|Function:                                             |\n";
+	std::cout << "|          1.Man Vs AI (AI first)                      |\n";
+	std::cout << "|          2.Man Vs AI  (Man first)                    |\n";
+	std::cout << "|          3.Man Vs Man                                |\n";
+	std::cout << "|          4.Look up the scorelist                     |\n";
+	std::cout << "|          5.AI Vs AI                                  |\n";
+	std::cout << "|      When playing ,press ESC to quit the Game        |\n";
+	std::cout << "--------------------------------------------------------\n";
+	while (true)
+	{
+		switch (_getch())
+		{
+		case '1':
+			ManVsAI(1);//AI先下
+			break;
+		case '2':
+			ManVsAI(2);//Man first drops
+			break;
+		case '3':
+			ManVsMan();
+			break;
+		case '4':
+			Sort_Scorelist();
+			Output();
+			system("pause");
+			break;
+		case '5':
+			AIvsAI();
+			break;
+		default:
+			std::cout << "input again: ";
+			break;
+		}
+		std::cin.sync();
+		startgame();
 	}
 }
-int main(void)
+
+int main()
 {
 	startgame();
 	return 0;
-}
-void runmangame()//人人模式 
-{ 
-	int input;//输入变量
-	initialize_board();//初始化对局
-	while(1){
-		system("cls");
-		print_board();
-		input=getch();
-		if(input==27) exit(0);
-		else if(input==' '){
-			if (!(chess_board[(Cx-1)/2][Cy/2]==' ')) continue;
-			chess_board[(Cx-1)/2][Cy/2]=cp;
-			if(cp=='*') cp='O';
-			else if(cp=='O') cp='*';
-			system("cls");
-			print_board();
-			count++;
-		}
-		else if(input==0xE0)//如果按下的是方向键，会填充两次输入，第一次为0xE0表示按下的是控制键  
-		{   
-			input=getch();//获得第二次输入信息  
-			switch(input)//判断方向键方向并移动光标位置  
-			{   
-				case 0x4B:Cy-=2;break; 
-				case 0x48:Cx-=2;break; 
-				case 0x4D:Cy+=2;break; 
-				case 0x50:Cx+=2;break; 
-			}
-			if(Cx<1)Cx=31;//如果光标位置越界则移动到对侧  
-			if(Cy<0)Cy=30;
-			if(Cx>31) Cx=1;  
-			if(Cy>30)Cy=0;
-			system("cls");
-			print_board();
-		}
-		is_winman((Cx-1)/2,Cy/2,cp);
-	}
 }
