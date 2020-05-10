@@ -1,3 +1,6 @@
+/*仅实现double型数字的加减乘除运算，不能包含括号，负数只能在第一个位置出现;
+*支持C++17标准
+*/
 #include <algorithm>
 #include <cctype>
 #include <cstring>
