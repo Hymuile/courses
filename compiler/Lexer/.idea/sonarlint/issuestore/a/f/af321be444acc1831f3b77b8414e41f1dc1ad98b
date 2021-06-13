@@ -1,0 +1,12 @@
+
+o
+java:S3776Q"RRefactor this method to reduce its Cognitive Complexity from 67 to the 15 allowed.(ôîÚá8óâİ‰/
+\
+java:S1118":Add a private constructor to hide the implicit public one.(Îä¦ûÿÿÿÿ8àë³ä‰/
+g
+java:S1192u"JDefine a constant instead of duplicating this literal "delimiter" 4 times.(‘§ô8…¿ä‰/
+b	java:S112Q"FDefine and throw a dedicated exception instead of using a generic one.(ôîÚá8è±îŞ‰/
+s
+java:S1450"QRemove the "br" field and declare it as a local variable in the relevant methods.(·»Õíúÿÿÿÿ8¨€ôŞ‰/
+i
+java:S2095A"LUse try-with-resources or close this "BufferedReader" in a "finally" clause.(áß×µ8ÇìŒä‰/
